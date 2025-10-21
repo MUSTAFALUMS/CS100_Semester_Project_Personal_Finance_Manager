@@ -7,6 +7,7 @@
 #include <cmath>
 #include <string>
 #include <map>
+#include <fstream>
 using namespace sf;
 using namespace std;
 
