@@ -16,30 +16,75 @@ class User{
     public:
         string username;
         string password;
+        string Email;
         double balance;
-        map<string, string> Logins; // Track login status
-        map<string, string> Users;
+        double MonthlyBudget;
+        string UserLoginStatusFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\Programs\\LoginLogout.csv";
+        string UserDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\Programs\\UserData.csv";
+        map<string, map<string, bool>, map<string, string>> Logins; // Track login status
+        map<string, map<string, string>, map<string, string>, map<string, string>> Users;
         
-        bool Login(string user, string pass){ // Add Save to, and Load from File Functionality
-            // Implementation of login functionality
+        // All functions related to user authentication
+        bool Login(string user, string pass) {
+
+            username = user;
+            password = pass;
+
+            // Get formatted timestamp
+            time_t now = time(0);
+            char* dt = ctime(&now);
+            
+            // Authenticate user credentials
             if (Authentication(user, pass, false)) {
                 cout << "Login successful for user: " << user << endl;
-                Logins[user] = "Login"; // Track successful login
+                Logins[user]["Login Status"] = true; // Track successful login
+                Logins[user]["Login Time"] = dt; // Track login time
+
+                // Save login event to file with timestamp
+                ofstream LoginLogoutFile(UserLoginStatusFilePath, ios::app);
+                
+                if (!LoginLogoutFile.is_open()) {
+                    cerr << "Error: Unable to open LoginLogout.csv for writing" << endl;
+                    return true; // Login succeeded but logging failed
+                }
+                
+                // Write login record (remove newline from ctime output)
+                LoginLogoutFile << user << "," << true << "," << dt;
+                LoginLogoutFile.close();
+                
                 return true;
             } else {
                 cout << "Login failed for user: " << user << endl;
                 return false;
             }
         }
-        bool Signup(string user, string pass){ // Add Save to File Functionality
+        bool Signup(string user, string pass, string email){ // Add Save to File Functionality
+            // Get formatted timestamp
+            time_t now = time(0);
+            char* dt = ctime(&now);
             // Implementation of signup functionality
             if (IsUsernameAvailable(user) && IsPasswordValid(pass)) {
-                Users[user] = pass;
+                passwordEncryption(pass, 7); // Encrypt password before storing
+                Users[user]["Password"] = pass;
+                Users[user]["Signup Time"] = dt;
+                Users[user]["Email"] = email;
                 cout << "Signup successful for user: " << user << endl;
                 return true;
             } else {
                 cout << "Signup failed for user: " << user << endl;
                 return false;
+            }
+        }
+        void passwordEncryption(string& pass, int shift){
+            // Simple encryption by shifting characters (Caesar cipher)
+            for (char &c : pass) {
+                c += shift; // Shift character by specified amount
+            }
+        }
+        void passwordDecryption(string& pass, int shift){
+            // Simple decryption by shifting characters back
+            for (char &c : pass) {
+                c -= shift; // Shift character back by specified amount
             }
         }
         bool IsUsernameAvailable(string user){
@@ -61,31 +106,127 @@ class User{
             }
             return hasUpper && hasLower && hasDigit && hasSpecial;
         }
-        void Logout(string user){
+        bool Logout(string user){
+            // Get formatted timestamp
+            time_t now = time(0);
+            char* dt = ctime(&now);
             // Implementation of logout functionality
-            Logins[user] = "Logout"; // Track logout
+            Logins[user]["Login Status"] = false; // Track successful login
+            Logins[user]["Login Time"] = dt; // Track login time
             cout << "User " << user << " logged out successfully." << endl;
+            // Save login event to file with timestamp
+                ofstream LoginLogoutFile(UserLoginStatusFilePath, ios::app);
+                
+            if (!LoginLogoutFile.is_open()) {
+                cerr << "Error: Unable to open LoginLogout.csv for writing" << endl;
+                return true; // Login succeeded but logging failed
+            }
+            
+            // Write login record (remove newline from ctime output)
+            LoginLogoutFile << user << "," << false << "," << dt;
+            LoginLogoutFile.close();
+            return true;
         }
         bool Authentication(string user, string pass, bool newAccount){
-            // Implementation of authentication functionality
-            auto FoundUser = Users.find(user);
-            // Check if user exists and password matches
-            // FoundUser points to a pair of (username, password) in the Users map
-            // If user is found and password matches, FoundUser != Users.end() returns true
-            // FoundUser->second points to the second value in the pair, stored in the map, which is the password
-            if (FoundUser != Users.end() && FoundUser->second == pass) {
-                return true;
+            // Implementation of authentication functionality using data stored in UserData file
+            ifstream userDataFile(UserDataFilePath);
+            if (!userDataFile.is_open()) {  
+                cerr << "Error: Unable to open UserData.csv for reading" << endl;
+                return false;
             }
-            return false;
+            string line;
+            while (getline(userDataFile, line)) {
+                size_t pos1 = line.find(',');
+                size_t pos2 = line.find(',', pos1 + 1);
+                size_t pos3 = line.find(',', pos2 + 1);
+                string fileUser = line.substr(0, pos1);
+                string fileEmail = line.substr(pos1 + 1, pos2 - pos1 - 1);
+                string filePass = line.substr(pos2 + 1, pos3 - pos2 - 1);
+                string fileSignupTime = line.substr(pos3 + 1);
+                
+                // Decrypt stored password for comparison
+                passwordDecryption(filePass, 7);
+                
+                if (!newAccount) {
+                    // For existing account login, check username and password
+                    if (fileUser == user && filePass == pass) {
+                        userDataFile.close();
+                        return true; // Authentication successful
+                    }
+                }
+            }
+            return false; // Authentication failed
+            
         }
-        void UpdateBalance(double amount);
-        void viewBalance(string user);
-        void SetBudget(double amount);
+        void UpdatePassword(string user, string oldPass, string newPass); 
+
+        // All functions related to financial management
+        void SetInitialBalance(double amount){
+            balance = amount;
+        }
+        void UpdateBalance(double amount){
+            balance += amount;
+        }
+        void viewBalance(string user){
+            cout << "Current balance for user " << user << " is: $" << fixed << setprecision(2) << balance << endl;
+        }
+        void SetBudget(double amount){
+            // Implementation of setting budget
+            cout << "Budget set to: $" << fixed << setprecision(2) << amount << endl;
+            MonthlyBudget = amount;
+        }
         void SetFinancialGoals(string user, string goal);
         void ViewFinancialGoals(string user);
-        void LoadUserData(string filename);
-        void UpdatePassword(string user, string oldPass, string newPass);   
-        void SaveChanges(string filename);
+
+        // Functions related to data persistence
+        void LoadUserData(string filename){
+            // Implementation of loading user data from file
+            ifstream userDataFile(filename);
+            if (!userDataFile.is_open()) {  
+                cerr << "Error: Unable to open " << filename << " for reading" << endl;
+                return;
+            }
+            string line;
+            while (getline(userDataFile, line)) {   
+                size_t pos1 = line.find(',');
+                size_t pos2 = line.find(',', pos1 + 1);
+                size_t pos3 = line.find(',', pos2 + 1);
+                size_t pos4 = line.find(',', pos3 + 1);
+                size_t pos5 = line.find(',', pos4 + 1);
+                size_t pos6 = line.find(',', pos5 + 1);
+                string fileUser = line.substr(0, pos1);
+                string fileEmail = line.substr(pos1 + 1, pos2 - pos1 - 1);
+                string filePass = line.substr(pos2 + 1, pos3 - pos2 - 1);
+                string fileLoginStatus = line.substr(pos4 + 1, pos5 - pos4 - 1);
+                string fileBalanceStr = line.substr(pos6 + 1);
+                double fileBalance = stod(fileBalanceStr);
+
+                Users[fileUser]["Email"] = fileEmail;
+                Users[fileUser]["Password"] = filePass;
+                Logins[fileUser]["Login Status"] = (fileLoginStatus == "1" || fileLoginStatus == "true");
+                if (fileUser == username) {
+                    balance = fileBalance; // Load balance for current user
+                }
+            }
+        }
+        void SaveUserData(string filename){
+            // Implementation of saving user data to file
+            ofstream userDataFile(filename);
+            if (!userDataFile.is_open()) {
+                cerr << "Error: Unable to open " << filename << " for writing" << endl;
+                return;
+            }
+            // Write user data to file
+            userDataFile << username << "," 
+                        <<  Users[username]["Email"] << "," 
+                        <<  Users[username]["Password"] << "," 
+                        <<  Users[username]["Signup Time"] << "," 
+                        << Logins[username]["Login Status"] << "," 
+                        << Logins[username]["Login Time"] << ","
+                        << balance << ","
+                        << endl;
+            userDataFile.close();
+        }
 
 };
 
