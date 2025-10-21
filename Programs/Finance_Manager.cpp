@@ -22,7 +22,7 @@ class User{
         string UserLoginStatusFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\Programs\\LoginLogout.csv";
         string UserDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\Programs\\UserData.csv";
         map<string, map<string, bool>, map<string, string>> Logins; // Track login status
-        map<string, map<string, string>, map<string, string>, map<string, string>> Users;
+        map<string, map<string, string>, map<string, string>, map<string, string>> Users; // Store user data
         
         // All functions related to user authentication
         bool Login(string user, string pass) {
@@ -158,7 +158,9 @@ class User{
             return false; // Authentication failed
             
         }
-        void UpdatePassword(string user, string oldPass, string newPass); 
+        void UpdatePassword(string user, string oldPass, string newPass){
+
+        }
 
         // All functions related to financial management
         void SetInitialBalance(double amount){
@@ -175,8 +177,12 @@ class User{
             cout << "Budget set to: $" << fixed << setprecision(2) << amount << endl;
             MonthlyBudget = amount;
         }
-        void SetFinancialGoals(string user, string goal);
-        void ViewFinancialGoals(string user);
+        void SetFinancialGoals(string user, string goal){
+
+        }
+        void ViewFinancialGoals(string user){
+            
+        }
 
         // Functions related to data persistence
         void LoadUserData(string filename){
