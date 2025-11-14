@@ -1,6 +1,6 @@
-#include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
 #include <SFML/System.hpp>
+#include <SFML/Graphics.hpp>
 #include <iostream>
 #include <vector>
 #include <ctime>
@@ -10,8 +10,9 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include <map>
+#include <sstream>
 using namespace std;
-using namespace sf;
 
 
 vector <string> UniqueUserIDs;
@@ -35,6 +36,7 @@ struct Transaction{
     double amount;
     string date;
     string description;
+    time_t timeCreated; // to manage revocation time limit
 };
 
 // User and Transaction Data Vectors
@@ -47,7 +49,7 @@ vector<Transaction> transactions;
 // User authentication and login management functions
 bool loginUser(string username, string password);
 bool logoutUser(string userID);
-bool signUpUser(string username, string password, string email);
+char signUpUser(string username, string password, string email);
 bool authenticateUser(string username, string password);
 bool isPasswordStrong(string password);
 bool isEmailValid(string email);
@@ -63,8 +65,8 @@ bool addUserToFile(const User &newUser, const string &filePath);
 bool removeUserFromFile(const string &userID, const string &filePath);
 void addUser(const User &newUser);
 void deleteUser(const string &userID);
-bool updateUser(const User &userToUpdate);
-User* getUser(const string &userID);
+bool updateUser(const User &userToUpdate, const string &filePath);
+User getUser(const string &username);
 void getAllUsers(const string &filepath, vector<User> &LoadedUsers);
 
 // User finance management functions
@@ -81,63 +83,437 @@ bool CreateNewTransaction(const string &userID, const string &type, double amoun
 bool RevokeTransaction(const string &userID, const string &transactionNumber, const string &filePath);
 bool SaveAllTransactions(const vector<Transaction> &userTransactions, const string &filePath);
 void LoadAllTransactions(const string &filePath, vector<Transaction> &loadedTransactions);
+void ExportMonthlyReport(const string &userID, int month, string year);
 
-// function prototype for loading data from bank statement
-bool LoadDataFromBankStatement(const string userID, const string filePath);
+
 
 
 int main()
 {
     // All relevant file paths
-    const string UserDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\Programs\\UserData.csv";
-    const string TransactionsDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\Programs\\TransactionsData.csv";
+    const string UserDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\UserData.csv";
+    const string TransactionsDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\TransactionsData.csv";
 
     // // Load existing users and transactions from files
     getAllUsers(UserDataFilePath, users);
     LoadAllTransactions(TransactionsDataFilePath, transactions);
 
-    // Your main program logic here
-    // Part 1: User Authentication and Management
-
-
-    // SFML window setup and event handling would go here
-    /*
-        SFML window created which display opens for login/signup on run
-        User can enter credentials to login or choose to sign up
-        If user login/ signup successful, proceed to main finance management interface
-        If user credentials invalid, show error message and allow retry
-        If new user signs up, validate inputs, create new user entry, save to UserData.csv
-    */
-    // sf::RenderWindow window(sf::VideoMode({800, 600}), "Personal Finance Manager");
-    
-    // if(!window.isOpen()){
-    //     cout << "Failed to create window!" << endl;
-    //     return -1;
-    // }
-        
-    // while(window.isOpen()){
-    //     while(const auto event = window.pollEvent()){
-    //         if(event->is<sf::Event::Closed>()){
-    //             cout << "Closing window..." << endl;
-    //             window.close();
-    //         }
-    //     }
-        
-    //     window.clear(sf::Color::Blue);  // Try blue to make it obvious
-    //     window.display();
-    // }
-    
-    return 0;
-    
+    // Your main program logic here : Logic built around Command Line Interface. GUI wrapper will be applied later using SFML.
     // User login, signup, logout functionalities would be called based on user interactions
 
+    for (User &user : users){
+        user.LoggedIn = false; // Set all users to logged out on program start
+    }
+
+
+    string username, password,email;
+    cout << "\tWelcome to the Personal Finance Manager!" << endl;
+    cout << "\tPlease login or sign up to continue. Enter L for login or S for sign up: ";
+    char choice;
+    cin >> choice;
+    choice = toupper(choice);
+
+    switch (choice) {
+        case 'L': {
+            cout << "\tEnter username: ";
+            cin >> username;
+            cout << "\tEnter password: ";
+            cin >> password;
+            do {
+                if (loginUser(username, password) == false) {
+                    cout << "\tINCORRECT USERNAME OR PASSWORD! Please try again." << endl;
+                    cout << "\tEnter username: ";
+                    cin >> username;
+                    cout << "\tEnter password: ";
+                    cin >> password;
+                }
+            }while (!loginUser(username, password));
+            cout << "\tUser " << username << " logged in successfully." << endl;
+            updateUser(getUser(username), UserDataFilePath);
+            break;
+        }
+        case 'S': {
+            cout << "\tEnter desired username: ";
+            cin >> username;
+            cout << "\tEnter desired password: ";
+            cin >> password;
+            cout << "\tEnter your email: ";
+            cin >> email;
+            char signUpStatus = signUpUser(username, password, email);
+            while (signUpStatus != 's'){
+                if (signUpStatus == 'u') {
+                        cout << "\tUsername already taken! Please try a different username." << endl;
+                        cout << "\tEnter desired username: ";
+                        cin >> username;
+                } else if (signUpStatus == 'p') {
+                    cout << "\tPassword does not meet criteria! Password should contain at least 8 characters, contains uppercase, lowercase, digit, and special character. " << endl;
+                    cout << "\tPlease try again!" << endl;
+                    cout << "\tEnter desired password: ";
+                    cin >> password;
+                } else if (signUpStatus == 'e') {
+                    cout << "\tInvalid email address! Please enter a valid email." << endl;
+                    cout << "\tEnter your email: ";
+                    cin >> email;
+                }
+            }
+            addUserToFile(users.back(), UserDataFilePath);
+            break;
+        }
+        default:
+            cout << "\tInvalid choice. Exiting program." << endl;
+            return 0;
+    }
 
     
+    while (true) {
+        bool exitProgram = false;
+        User currentUser = getUser(username);
+        string switchChoice;
+        if (currentUser.LoggedIn != 0){
+            cout << "\tWelcome " << currentUser.username << " to the Personal Finance Manager!" << endl;
+            cout << "\tPlease select an option:" << endl;
+            cout << "\t1. View Account Details" << endl;
+            cout << "\t2. Update Account Details" << endl;
+            cout << "\t3. Manage Transactions" << endl;
+            cout << "\t4. Logout" << endl;
+            cout << "\t5. Exit Program" << endl;
+            cout << "\tEnter your choice (1-5): ";
+            int option;
+            cin >> option;
 
+            string t_type, t_description, t_transactionNo;
+            double t_amount;
 
+            switch (option) {
+                case 1:
+                    // View account details
+                    while (true){
+                        bool backToMenu = false;
+                        // Choice for viewing balance, monthly budget, savings goal
+                        cout << "\tPlease select an option to view:" << endl;
+                        cout << "\t1. View Balance" << endl;
+                        cout << "\t2. View Monthly Budget" << endl;
+                        cout << "\t3. View Savings Goal" << endl;
+                        cout << "\t4. View Prediction to Reach Savings Goal" << endl;
+                        cout << "\t5. Export Monthly Report" << endl;
+                        cout << "\t6. Back to Main Menu" << endl;
+                        cout << "\tEnter your choice (1-6): ";
+                        int viewOption;
+                        cin >> viewOption;
 
+                        switch (viewOption) {
+                            case 1:
+                                cout << endl;
+                                cout << "\tCurrent Balance: $" << GetBalance(currentUser.userID) << endl;
+                                break;
+                            case 2:
+                                cout << endl;
+                                cout << "\tMonthly Budget: $" << GetMonthlyBudget(currentUser.userID) << endl;
+                                break;
+                            case 3:
+                                cout << endl;
+                                cout << "\tSavings Goal: $" << GetSavingsGoal(currentUser.userID) << endl;
+                                break;
+                            case 4:
+                                {
+                                    double balance = GetBalance(currentUser.userID);
+                                    double savingsGoal = GetSavingsGoal(currentUser.userID);
+                                    double monthlyBudget = GetMonthlyBudget(currentUser.userID);
+                                    double monthlySavings = monthlyBudget * 0.2; // Assuming 20% of ballance is saved monthly
+                                    cout << endl;
+                                    if (monthlySavings <= 0) {
+                                        cout << "\tYou need to have a positive monthly savings to reach your goal." << endl;
+                                    } else {
+                                        double monthsNeeded = (savingsGoal - balance) / monthlySavings;
+                                        if (monthsNeeded < 0) {
+                                            cout << "\tCongratulations! You have already reached your savings goal." << endl;
+                                        } else {
+                                            cout << "\tAt your current savings rate, you will reach your savings goal in approximately " 
+                                                << ceil(monthsNeeded) << " months." << endl;
+                                        }
+                                    }
+                                }
+                                break;
+                            case 5:
+                                {
+                                    // provide option to user to export monthly reports of month past, based on current month and year
+                                    // It should only provide option for report since the month of user signup
+                                    string currentUserSignUpTime = currentUser.SignUptime;
+                                    string monthSignup = currentUserSignUpTime.substr(4,3);
+                                    string yearSignup = currentUserSignUpTime.substr(currentUserSignUpTime.length() - 5,4);
+                                    time_t now = time(0);
+                                    tm *ltm = localtime(&now);
+                                    int month = 1 + ltm->tm_mon; // tm_mon is 0-11
+
+                                    map<string, int> monthMap = {{"Jan",1}, {"Feb",2}, {"Mar",3}, {"Apr",4}, {"May",5}, {"Jun",6},
+                                                                {"Jul",7}, {"Aug",8}, {"Sep",9}, {"Oct",10}, {"Nov",11}, {"Dec",12}};
+                                    
+                                    cout << "\tSelect month to export report (since your signup in " << monthSignup << " " << yearSignup << "):" << endl;
+                                    for (const auto &month : monthMap) {
+                                        if (month.second >= monthMap[monthSignup] && yearSignup == to_string(2025 + ltm->tm_year)) {
+                                            cout << "\t" << month.first << " " << yearSignup << endl;
+                                        }
+                                    }
+                                    string selectedYear;
+                                    string selectedMonth;
+                                    cout << "\tEnter year from available year reports: ";
+                                    cin >> selectedYear;
+                                    cout << "\tEnter month from available month reports: ";
+                                    cin >> selectedMonth;
+
+                                    if (monthMap.find(selectedMonth) != monthMap.end()) {
+                                        int monthNum = monthMap[selectedMonth];
+                                        ExportMonthlyReport(currentUser.userID, monthNum, selectedYear);
+                                        cout << "\tMonthly report for " << selectedMonth << " " << selectedYear << " exported successfully." << endl;
+                                    } else {
+                                        cout << "\tInvalid month selected." << endl;
+                                    }
+                                }
+                                break;
+                            case 6:
+                                backToMenu = true;
+                                break;
+                            default:
+                                cout << "\tInvalid option. Please try again." << endl;
+                        }
+                    if (backToMenu) break;
+                    }
+                    break;
+                case 2:
+                    // Update account details
+                    // Choice for updating password, email, balance, monthly budget, savings goal
+                    while (true){
+                        bool backToMenu = false;
+                        cout << "\tPlease select an option to update:" << endl;
+                        cout << "\t1. Update Password" << endl;
+                        cout << "\t2. Update Email" << endl;
+                        cout << "\t3. Add to Balance" << endl;
+                        cout << "\t4. Update Monthly Budget" << endl;
+                        cout << "\t5. Update Savings Goal" << endl;
+                        cout << "\t6. Back to Main Menu" << endl;
+                        cout << "\tEnter your choice (1-6): ";
+                        int updateOption;
+                        cin >> updateOption;
+                        switch(updateOption){
+                            case 1: 
+                                do {
+                                    cout << "\tEnter new password: ";
+                                    cin >> password;
+                                }while(!UpdatePassword(currentUser.userID, password));
+                                break;  
+                            case 2:
+                                do {
+                                    cout << "\tEnter new email: ";
+                                    cin >> email;
+                                }while(!UpdateEmail(currentUser.userID, email));
+                                break;
+                            case 3:
+                                double amountToAdd;
+                                cout << "\tEnter amount to add: ";
+                                cin >> amountToAdd;
+                                UpdateBalance(currentUser.userID, amountToAdd);
+                                break;
+                            case 4:
+                                double newBudget;
+                                cout << "\tEnter new monthly budget: ";
+                                cin >> newBudget;
+                                SetMonthlyBudget(currentUser.userID, newBudget);
+                                break;
+                            case 5:
+                                double newGoal;
+                                cout << "\tEnter new savings goal: ";
+                                cin >> newGoal;
+                                SetSavingsGoal(currentUser.userID, newGoal);
+                                break;
+                            case 6:
+                                backToMenu = true;
+                                break;  
+                        }
+                        updateUser(currentUser, UserDataFilePath);
+                        if (backToMenu) break;
+                    }
+                    break;
+                case 3:
+                    // Manage transactions
+                    // Add transaction, revoke transaction (with time limit), view transaction history
+                    // Provide option to revoke transsaction after Transaction is added, with time limit of 5 minutes
+                    while (true){
+                        bool backToMenu = false;
+                        cout << "\tPlease select an option:" << endl;
+                        cout << "\t1. Add Transaction" << endl;
+                        cout << "\t2. Revoke Transaction(s)" << endl;
+                        cout << "\t3. View Transaction History" << endl;
+                        cout << "\t4. Back to main menu" << endl;
+                        cout << "\tEnter your choice (1-4): ";
+                        int transactionOption;
+                        cin >> transactionOption;
+                        time_t timeNow;
+                        
+                        switch (transactionOption){
+                            case 1:
+                                // Add Transaction
+                                cout << "\tEnter transaction type (income/expense): ";
+                                cin >> t_type;
+                                cout << "\tEnter amount: ";
+                                cin >> t_amount;
+                                cout << "\tEnter description: ";
+                                cin.ignore(); // to ignore the newline character left in the buffer
+                                getline(cin, t_description);
+                                if (CreateNewTransaction(currentUser.userID, t_type, t_amount, t_description)){
+                                    cout << "\tTransaction added successfully." << endl;
+                                }else{
+                                    cout << "\tFailed to add transaction." << endl;
+                                }
+                                break;
+                            case 2:
+                                // Show all upto last 5 revokable transactions
+                                cout << endl;
+                                cout << "\tRevokable Transactions (within 5 minutes of creation):" << endl;
+                                cout << "\t----------------------------------------" << endl;
+                                cout << "\tUser ID   | Transaction No | Type | Amount | Date       | Description" << endl;
+
+                                for (const Transaction &trans : transactions) {
+                                    if (trans.timeCreated + 300 >= time(0) && trans.userID == currentUser.userID) {
+                                        cout << "\t" << currentUser.userID << "          | "<< trans.transactionNo << "          | " << trans.type << " | $" << trans.amount << " | " << trans.date << " | " << trans.description << endl;
+                                    }
+                                }
+                                cout << "\t-----------------------------------------------------------------------" << endl;
+                                // Revoke Transaction
+                                cout << "\tEnter transaction number to revoke: ";
+                                getline(cin, t_transactionNo);
+                                if (RevokeTransaction(currentUser.userID, t_transactionNo, TransactionsDataFilePath)){
+                                    cout << "\tTransaction revoked successfully." << endl;
+                                }else{
+                                    cout << "\tFailed to revoke transaction. It may be past the revocation time limit or invalid transaction number." << endl;
+                                }
+
+                            case 3:
+                                // View Transaction History
+                                cout << endl;
+                                cout << "\tTransaction History:" << endl;
+                                cout << "\t----------------------------------------" << endl;
+                                cout << "\tUser ID   | Transaction No | Type | Amount | Date       | Description" << endl;
+                                cout << "\t-----------------------------------------------------------------------" << endl;
+                                for (const Transaction &trans : transactions) {
+                                    if (trans.userID == currentUser.userID) {
+                                        cout << "\t" << currentUser.userID << "          | "<< trans.transactionNo << "          | " << trans.type << " | $" << trans.amount << " | " << trans.date << " | " << trans.description << endl;
+                                    }
+                                }
+                                cout << "\t-----------------------------------------------------------------------" << endl;
+                                break;
+                            case 4:
+                                backToMenu = true;
+                                break;
+                            }
+                            if (backToMenu) break;
+                        }
+                    break;
+                case 4:
+                    // Logout
+                    logoutUser(currentUser.userID);
+                    updateUser(getUser(currentUser.username), UserDataFilePath);
+                    break;
+                case 5:
+                    // Exit program
+                    exitProgram = true;
+                    cout << "\tExiting program." << endl;
+                    break;
+                default:
+                    cout << "\tInvalid option. Please try again." << endl;
+                    break;
+            }
+        }else{
+            cout << "\tWelcome to the Personal Finance Manager!" << endl;
+            cout << "\tPlease login or sign up to continue. Enter L for login, S for sign up, or E for exit: ";
+            char choice;
+            cin >> choice;
+            choice = toupper(choice);
+
+            switch (choice) {
+                case 'L': {
+                    cout << "\tEnter username: ";
+                    cin >> username;
+                    cout << "\tEnter password: ";
+                    cin >> password;
+                    do {
+                        if (!loginUser(username, password)) {
+                            cout << "\tINCORRECT USERNAME OR PASSWORD! Please try again." << endl;
+                            cout << "\tEnter username: ";
+                            cin >> username;
+                            cout << "\tEnter password: ";
+                            cin >> password;
+                        }
+                    }while (!loginUser(username, password));
+                    cout << "\tUser " << username << " logged in successfully." << endl;
+                    updateUser(getUser(username), UserDataFilePath);
+                    break;
+                }
+                case 'S': {
+                    cout << "\tEnter desired username: ";
+                    cin >> username;
+                    cout << "\tEnter desired password: ";
+                    cin >> password;
+                    cout << "\tEnter your email: ";
+                    cin >> email;
+                    char signUpStatus = signUpUser(username, password, email);
+                    while (signUpStatus != 's'){
+                        if (signUpStatus == 'u') {
+                                cout << "\tUsername already taken! Please try a different username." << endl;
+                                cout << "\tEnter desired username: ";
+                                cin >> username;
+                        } else if (signUpStatus == 'p') {
+                            cout << "\tPassword does not meet criteria! Password should contain at least 8 characters, contains uppercase, lowercase, digit, and special character. " << endl;
+                            cout << "\tPlease try again!" << endl;
+                            cout << "\tEnter desired password: ";
+                            cin >> password;
+                        } else if (signUpStatus == 'e') {
+                            cout << "\tInvalid email address! Please enter a valid email." << endl;
+                            cout << "\tEnter your email: ";
+                            cin >> email;
+                        }
+                    }
+                    addUserToFile(users.back(), UserDataFilePath);
+                    break;
+                }
+                case 'E':
+                    exitProgram = true;
+                    cout << "\tExiting program." << endl;
+                    break;
+                default:
+                    cout << "\tInvalid choice. Exiting program." << endl;
+                    return 0;
+            }
+        }
+        if (exitProgram) break;
+    }
+
+    sf::Window window(sf::VideoMode({800, 600}), "Personal Finance Manager");
+    sf::String userInput;
+    const std::string fontPath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\times.ttf";
+    sf::Font font;
+    if (!font.openFromFile(fontPath)) {
+        return 1;
+    }
+    
+    
+    // run the program as long as the window is open
+    while (window.isOpen())
+    {
+        // check all the window's events that were triggered since the last iteration of the loop
+        while (const std::optional event = window.pollEvent())
+        {
+            // "close requested" event: we close the window
+            if (event->is<sf::Event::Closed>()) window.close();
+
+            // handle other events...
+        }
+
+        window.display();
+    }
 
     
+    return 0;
+
 }
 
 // Functions Definitions
@@ -151,40 +527,35 @@ bool loginUser(string username, string password){
             user.LoggedIn = true;
             time_t now = time(0);
             user.LoginLogoutTime = ctime(&now);
-            cout << "User " << username << " logged in successfully." << endl;
             return true;
         }
     }
-    cout << "Invalid username or password." << endl;
     return false;
 }
 // Manages user logout
 bool logoutUser(string userID){
     for(User &user : users){
-        if(user.userID == userID && user.LoggedIn){
+        if(user.userID == userID && user.LoggedIn != 0){
             user.LoggedIn = false;
             time_t now = time(0);
             user.LoginLogoutTime = ctime(&now);
-            cout << "User " << user.username << " logged out successfully." << endl;
+            cout << "\tUser " << user.username << " logged out successfully." << endl;
             return true;
         }
     }
-    cout << "User not found or not logged in." << endl;
+    cout << "\tUser not found or not logged in." << endl;
     return false;
 }
 // Manages new user sign up
-bool signUpUser(string username, string password, string email){
+char signUpUser(string username, string password, string email){
     if(!isUsernameAvailable(username)){
-        cout << "Username already taken." << endl;
-        return false;
+        return 'u';
     }
     if(!isPasswordStrong(password)){
-        cout << "Password does not meet criteria." << endl;
-        return false;
+        return 'p';
     }
     if(!isEmailValid(email)){
-        cout << "Invalid email address." << endl;
-        return false;
+        return 'e';
     }
     time_t now = time(0);
     User newUser;
@@ -194,22 +565,25 @@ bool signUpUser(string username, string password, string email){
     newUser.balance = 0.0;
     newUser.MonthlyBudget = 0.0;
     newUser.SavingsGoal = 0.0;
-    newUser.LoggedIn = false;
+    newUser.LoggedIn = true;
     newUser.SignUptime = ctime(&now);
+
+    //Encrypt Password
+    PasswordEncryption(newUser.password, 7); // Simple Caesar cipher with shift of 7
     // Generate unique user ID
     generateUniqueUserID(newUser);
     addUser(newUser);
-    cout << "User signed up successfully. User ID: " << newUser.userID << endl;
-    return true;
+    cout << "\tUser signed up successfully. User ID: " << newUser.userID << endl;
+    return 's';
 }
 // Authenticates user credentials
 bool authenticateUser(string username, string password){
     // check if username matches and password after decryption matches
+    string encryptedPassword = password;
+    PasswordEncryption(encryptedPassword, 7); // Encrypt entered password to compare the stored encrypted password for authentication
     for(const User &user : users){
         if(user.username == username){
-            string decryptedPassword = password;
-            PasswordDecryption(decryptedPassword, 7); // Decrypt with the same shift used in encryption
-            if(user.password == decryptedPassword){
+            if(user.password == encryptedPassword){
                 return true;
             }
         }
@@ -219,7 +593,7 @@ bool authenticateUser(string username, string password){
 }
 // Check if password meets criteria
 bool isPasswordStrong(string password){
-    // Example criteria: at least 8 characters, contains uppercase, lowercase, digit, and special character
+    // Criteria: at least 8 characters, contains uppercase, lowercase, digit, and special character
     if(password.length() < 8) return false;
     bool hasUpper = false, hasLower = false, hasDigit = false, hasSpecial = false;
     for(char c : password){
@@ -251,6 +625,7 @@ void generateUniqueUserID(User &newUser){
     // User ID generation logic
     // Each user ID follows the format "UXXXX" where XXXX is a unique 4-digit number
     // validate uniqueness against existing user IDs, checking via UniqueUserIDs vector
+    srand(static_cast<unsigned int>(time(0)));
     string userID;
     do{
         int randomNum = rand() % 10000; // Generate a random number between 0 and 9999
@@ -382,21 +757,21 @@ bool updateUser(const User &userToUpdate, const string &filePath){
         return false;
     }
     for(const User &user : users){
-        outFile << user.userID << "," << user.username << "," << user.password << "," << user.Email << ","
-        << user.balance << "," << user.MonthlyBudget << "," << user.SavingsGoal << "," << user.LoggedIn<< "," << user.SignUptime<< "," 
-        << user.LoginLogoutTime << endl;
+       outFile << user.userID << "," << user.username << "," << user.password << "," << user.Email << ","
+    << user.balance << "," << user.MonthlyBudget << "," << user.SavingsGoal << "," << user.LoggedIn<< "," << user.SignUptime<< "," 
+    << user.LoginLogoutTime << "," << endl;
     }
     outFile.close();
     return true;
 }
-// Retrieves user details based on userID
-User* getUser(const string &userID){
+// Retrieves user details based on username
+User getUser(const string &username){
     for(User &user : users){
-        if(user.userID == userID){
-            return &user;
+        if(user.username == username){
+            return user;
         }
     }
-    return nullptr;
+    return User(); // Return default User if not found
 }
 // Retrieves all users
 void getAllUsers(const string &filepath, vector<User> &loadedUsers){
@@ -407,30 +782,48 @@ void getAllUsers(const string &filepath, vector<User> &loadedUsers){
     }
     string line;
     while(getline(inFile, line)){
+        if (line.length() == 1) continue; // Skip comma lines 
         User user;
-        size_t pos = 0;
-        vector<string> tokens;
-        while((pos = line.find(',')) != string::npos){
-            tokens.push_back(line.substr(0, pos));
-            line.erase(0, pos + 1);
+        stringstream ss(line);
+        int fieldIndex = 0;
+        while(getline(ss, line, ',')){
+            switch(fieldIndex){
+                case 0:
+                    user.userID = line;
+                    break;
+                case 1:
+                    user.username = line;
+                    break;
+                case 2:
+                    user.password = line;
+                    break;
+                case 3:
+                    user.Email = line;
+                    break;
+                case 4:
+                    user.balance = stod(line);
+                    break;
+                case 5:
+                    user.MonthlyBudget = stod(line);
+                    break;
+                case 6:
+                    user.SavingsGoal = stod(line);
+                    break;
+                case 7:
+                    user.LoggedIn = stoi(line);
+                    break;
+                case 8:
+                    user.SignUptime = line;
+                    break;
+                case 9:
+                    user.LoginLogoutTime = line;
+                    break;
+            }
+            fieldIndex++;
         }
-        tokens.push_back(line); // last token
+        loadedUsers.push_back(user);
+        UniqueUserIDs.push_back(user.userID);
 
-        if(tokens.size() == 10){
-            user.userID = tokens[0];
-            user.username = tokens[1];
-            user.password = tokens[2];
-            user.Email = tokens[3];
-            user.balance = stod(tokens[4]);
-            user.MonthlyBudget = stod(tokens[5]);
-            user.SavingsGoal = stod(tokens[6]);
-            user.LoggedIn = (tokens[7] == "1" || tokens[7] == "true");
-            user.SignUptime = tokens[8];
-            user.LoginLogoutTime = tokens[9];
-
-            loadedUsers.push_back(user);
-            UniqueUserIDs.push_back(user.userID);
-        }
     }
     inFile.close();
     
@@ -530,6 +923,7 @@ bool CreateNewTransaction(const string &userID, const string &type, double amoun
     tm *ltm = localtime(&now);
     string date = to_string(1900 + ltm->tm_year) + "-" + to_string(1 + ltm->tm_mon) + "-" + to_string(ltm->tm_mday);
     Transaction newTransaction;
+    newTransaction.timeCreated = now;
     newTransaction.userID = userID;
     newTransaction.type = type;
     newTransaction.amount = amount;
@@ -599,27 +993,59 @@ void LoadAllTransactions(const string &filePath, vector<Transaction> &loadedTran
         cerr << "Error opening file for reading." << endl;
         return;
     }
+    // reads each line from the TransactionsData.csv file, parses the comma-separated values, and populates the loadedTransactions vector with Transaction struct instances
     string line;
-    vector<string> tokens;
     while(getline(inFile, line)){
-        size_t pos = 0;
-        if ((pos == line.find(',')) != string::npos) {
-            tokens.push_back(line.substr(0,pos));
-            line.erase(0, pos + 1);
-        }   
-        tokens.push_back(line); // last token
+       Transaction trans;
+        stringstream ss(line);
+        int fieldIndex = 0;
+        while(getline(ss, line, ',')){
+            switch(fieldIndex){
+                case 0:
+                    trans.userID = line;
+                    break;
+                case 1:
+                    trans.transactionNo = line;
+                    break;
+                case 2:
+                    trans.type = line;
+                    break;
+                case 3:
+                    trans.description = line;
+                    break;
+                case 4:
+                    trans.amount = stod(line);
+                    break;
+                case 5:
+                    trans.date = line;
+                    break;
+            }
+            fieldIndex++;
+        }
+        loadedTransactions.push_back(trans);
     }
     inFile.close();
-
-    // Assuming transaction file contains all necessary functions
-    if (tokens.size() == 6){
-        trans.userID = tokens[0];
-        trans.transactionNo = tokens[1];
-        trans.type = tokens[2]; 
-        trans.description = tokens[3];
-        trans.amount = stod(tokens[4]);
-        trans.date = tokens[5];
-    }
+    return;
 }
-// Loads data from bank statement file
-bool LoadDataFromBankStatement(const string userID, const string filePath);
+// Exports monthly report for user
+void ExportMonthlyReport(const string &userID, int month, string year){
+    string Months[] = {"January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"};
+    // filepath format: "Month_Year_UserID_MonthlyReport.csv"
+    string filePath = Months[month - 1] + "_" + year + "_" + userID + "_MonthlyReport.csv";
+    ofstream outFile(filePath);
+    if(!outFile){
+        cerr << "Error opening file for writing." << endl;
+        return;
+    }
+    outFile << "Monthly Report for User ID: " << userID << endl;
+    outFile << "----------------------------------------" << endl;
+    outFile << "Transaction No, Type, Description, Amount, Date" << endl;
+    for(const Transaction &trans : transactions){
+        if(trans.userID == userID){
+            outFile << trans.transactionNo << ", " << trans.type << ", " << trans.description << ", " << trans.amount << ", " << trans.date << endl;
+        }
+    }
+    outFile.close();
+    cout << "Monthly report exported successfully for user ID " << userID << endl;
+    return;
+}
