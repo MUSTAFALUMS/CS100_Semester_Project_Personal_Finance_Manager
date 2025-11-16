@@ -484,6 +484,7 @@ void onClickRemoveTransaction(){
     currentUser = getUser(currentUserName);
     RemoveTransaction(currentUser.userID, currentTransactionDescription, TransactionsDataFilePath);
     SaveAllTransactions(transactions, TransactionsDataFilePath);
+    updateUser(currentUser, UserDataFilePath);
 
     // Clear buttons and reset flag
     for (auto* btn : RemovableTransactionButtons) {
