@@ -1,10 +1,10 @@
 all: compile link
 
 compile:
-	g++ -I"D:\LUMS\Semester 1\CS 100\CS100_Semester_Project_Personal_Finance_Manager\src\include" -c Programs/*.cpp
+	g++ -I"D:\LUMS\Semester 1\CS 100\CS100_Semester_Project_Personal_Finance_Manager\src\include" -c Programs/Finance_Manager.cpp
 
 link:
-	g++ *.o -o Finance_Manager -L"D:\LUMS\Semester 1\CS 100\CS100_Semester_Project_Personal_Finance_Manager\src\lib" -lsfml-graphics -lsfml-window -lsfml-system -lsfml-main
+	g++ Finance_Manager.o -o Finance_Manager -L"D:\LUMS\Semester 1\CS 100\CS100_Semester_Project_Personal_Finance_Manager\src\lib" -lsfml-graphics -lsfml-window -lsfml-system -lsfml-main
 
 clean:
 	del *.o Finance_Manager.exe
