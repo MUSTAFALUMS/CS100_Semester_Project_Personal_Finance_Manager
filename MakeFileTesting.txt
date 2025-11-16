@@ -1,0 +1,10 @@
+all: compile link
+
+compile:
+	g++ -I"D:\LUMS\Semester 1\CS 100\CS100_Semester_Project_Personal_Finance_Manager\src\include" -c Programs/GUI_testing.cpp
+
+link:
+	g++ GUI_testing.o -o GUI_testing -L"D:\LUMS\Semester 1\CS 100\CS100_Semester_Project_Personal_Finance_Manager\src\lib" -lsfml-graphics -lsfml-window -lsfml-system -lsfml-main
+
+clean:
+	del *.o GUI_testing.exe
