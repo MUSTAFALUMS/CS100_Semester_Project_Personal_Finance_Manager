@@ -498,7 +498,6 @@ void onClicklogout(){
     // logout logic here
     logoutUser(currentUser.userID);
     currentUser.LoggedIn = false;
-    updateUser(currentUser, UserDataFilePath);
     // GO BACK TO LOGIN/SIGNUP PAGE
     currentPage = PageState::LOGIN_SIGNUP;
 }
@@ -580,7 +579,10 @@ int main() {
     getAllUsers(UserDataFilePath, users);
     LoadAllTransactions(TransactionsDataFilePath, transactions);
 
+    currentUser.LoggedIn = false;
+    updateUser(currentUser, UserDataFilePath);
     currentUser.LoggedIn = true;
+
 
     sf::RenderWindow window(sf::VideoMode({900, 650}), "Personal Finance Manager");
     window.setFramerateLimit(60);
@@ -1549,6 +1551,7 @@ bool logoutUser(string userID){
             time_t now = time(0);
             user.LoginLogoutTime = ctime(&now);
             cout << "\tUser " << user.username << " logged out successfully." << endl;
+                updateUser(user, UserDataFilePath);
             return true;
         }
     }
