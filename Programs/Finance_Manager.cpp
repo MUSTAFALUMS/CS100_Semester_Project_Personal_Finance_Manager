@@ -88,8 +88,8 @@ void LoadAllTransactions(const string &filePath, vector<Transaction> &loadedTran
 void ExportMonthlyReport(const string &userID, int month, string year);
 
 // All relevant file paths
-const string UserDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\UserData.csv";
-const string TransactionsDataFilePath = "D:\\LUMS\\Semester 1\\CS 100\\CS100_Semester_Project_Personal_Finance_Manager\\TransactionsData.csv";
+const string UserDataFilePath = "./UserData.csv";
+const string TransactionsDataFilePath = "./TransactionsData.csv";
 
 
 // GUI elements
