@@ -484,8 +484,6 @@ void onClickRemoveTransaction(){
     currentUser = getUser(currentUserName);
     RemoveTransaction(currentUser.userID, currentTransactionDescription, TransactionsDataFilePath);
     SaveAllTransactions(transactions, TransactionsDataFilePath);
-    updateUser(currentUser, UserDataFilePath);
-
     // Clear buttons and reset flag
     for (auto* btn : RemovableTransactionButtons) {
         delete btn;
@@ -1951,12 +1949,20 @@ bool CreateNewTransaction(const string &userID, const string &type, double amoun
     // Update user balance accordingly
     if(type == "Income"){
         UpdateBalance(userID, amount);
+        User user = getUser(userID);
+        double newBudget = GetMonthlyBudget(userID) + amount;
+        cout << "New Budget after income: " << newBudget << endl;
+        SetMonthlyBudget(userID, to_string(newBudget));
     } else if(type == "Expense"){
         if (amount > GetBalance(userID)){
             cout << "Failed to create transaction due to insufficient balance." << endl;
             return false;
         }else{
             UpdateBalance(userID, -amount);
+            User user = getUser(userID);
+            double newBudget = GetMonthlyBudget(userID) - amount;
+            cout << "New Budget after expense: " << newBudget << endl;
+            SetMonthlyBudget(userID, to_string(newBudget));
         }
     } else{
         cout << "Invalid transaction type." << endl;
@@ -1982,19 +1988,34 @@ bool RemoveTransaction(const string &userID, const string &transactionNumber, co
         Transaction transToRemove = *it;
         // Update user balance accordingly
         if(transToRemove.type == "Income"){
+            cout << "Removing Income Transaction: " << transToRemove.amount << endl;
+            double newBudget = GetMonthlyBudget(userID) - transToRemove.amount;
+            cout << "New Budget after removing income: " << newBudget << endl;
             UpdateBalance(userID, -transToRemove.amount);
+            if (SetMonthlyBudget(userID, to_string(newBudget))){
+                cout << "Monthly budget updated successfully after removing income transaction." << endl;
+            }
         } else if(transToRemove.type == "Expense"){
+            cout << "Removing Expense Transaction: " << transToRemove.amount << endl;
             UpdateBalance(userID, transToRemove.amount);
+            double newBudget = GetMonthlyBudget(userID) + transToRemove.amount;
+            cout << "New Budget after removing expense: " << newBudget << endl;
+            if (SetMonthlyBudget(userID, to_string(newBudget))){
+                cout << "Monthly budget updated successfully after removing expense transaction." << endl;
+            }
         }
         transactions.erase(it, transactions.end());
         // Rewrite the Transactions file
         SaveAllTransactions(transactions, filePath);
         cout << "Transaction " << transactionNumber << " removed successfully for user ID " << userID << endl;
+        updateUser(getUser(userID), UserDataFilePath);
         return true;
     } else{
         cout << "Transaction " << transactionNumber << " not found for user ID " << userID << endl;
+        updateUser(getUser(userID), UserDataFilePath);
         return false;
     }
+   
 }
 // Saves all transactions from the transactions vector to the user's transaction file
 bool SaveAllTransactions(const vector<Transaction> &userTransactions, const string &filePath){
