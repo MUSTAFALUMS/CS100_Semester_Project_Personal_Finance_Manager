@@ -1296,7 +1296,7 @@ int main() {
             sf::FloatRect HaveReachedSavingsGoalBounds = HaveReachedSavingsGoal.getLocalBounds();
             HaveReachedSavingsGoal.setOrigin({HaveReachedSavingsGoalBounds.position.x + HaveReachedSavingsGoalBounds.size.x/2.0f, 
             HaveReachedSavingsGoalBounds.position.y + HaveReachedSavingsGoalBounds.size.y/2.0f});
-            HaveReachedSavingsGoal.setPosition({250.0f, 250.0f});
+            HaveReachedSavingsGoal.setPosition({350.0f, 250.0f});
             // Update Mouse position for buttons
             GoBackToDashboardFromAccountDetailsPage.update(mousePos);
             GoToSetNewBugdetPage.update(mousePos);
@@ -1823,10 +1823,10 @@ void getAllUsers(const string &filepath, vector<User> &loadedUsers){
                     user.MonthlyBudget = stod(line);
                     break;
                 case 6:
-                    user.SavingsGoal = stod(line);
+                    user.SavingsAmount = stod(line);
                     break;
                 case 7:
-                    user.SavingsAmount = stod(line);
+                    user.SavingsGoal = stod(line);
                     break;
                 case 8:
                     user.LoggedIn = stoi(line);
@@ -2096,3 +2096,4 @@ void ExportMonthlyReport(const string &userID, int month, string year){
     cout << "Monthly report exported successfully for user ID " << userID << endl;
     return;
 }
+
